@@ -1,0 +1,34 @@
+name: Deployment Pipeline           
+on: 
+  push:
+    branches: [ "main" ]            
+
+jobs:
+  validation:                       
+    runs-on: ubuntu-22.04           
+    steps:
+      - uses: actions/checkout@v3   
+      - name: Configure Python
+        uses: actions/setup-python@v3
+        with: 
+          python-version: '3.12'
+          cache: 'pip'              
+      - name: Run Verification      
+        run: |
+          pip install -r requirements.txt
+          pytest -v
+
+  containerize:                    
+    needs: validation
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create Docker Image
+        run: docker build -t ${{ secrets.DOCKER_USER }}/student_devops:latest .
+      - name: Authenticate
+        run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+      - name: Publish Image
+        run: |
+          docker push ${{ secrets.DOCKER_USER }}/student_devops:latest
+          docker tag ${{ secrets.DOCKER_USER }}/student_devops:latest ${{ secrets.DOCKER_USER }}/student_devops:${{ github.run_number }}
+          docker push ${{ secrets.DOCKER_USER }}/student_devops:${{ github.run_number }}
